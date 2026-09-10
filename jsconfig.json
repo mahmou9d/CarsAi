@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "resolveJsonModule": true,
+    "moduleResolution": "node"
+  },
+  "include": [
+    "app/**/*",
+    "components/**/*",
+    "actions/**/*",
+    "lib/**/*",
+    "hooks/**/*",
+    "*.js",
+    "*.mjs"
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    ".next"
+  ]
+}
