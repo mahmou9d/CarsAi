@@ -68,11 +68,11 @@ export default async function Home() {
           <div className="relative max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-14 items-center">
             <div>
               <h1 className="text-5xl md:text-7xl font-[800] leading-[1.02] tracking-tight mb-7 max-w-xl">
-                Find the car you'll actually keep
+                Find the car you&aposll actually keep
               </h1>
               <p className="text-[#4A4A4A] text-lg leading-relaxed mb-10 max-w-md">
                 Every car on the lot is driven, checked and signed off by our
-                team before it's listed. No surprises, no pressure.
+                team before it&aposs listed. No surprises, no pressure.
               </p>
               <div className="max-w-xl bg-white rounded-2xl shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] p-2">
                 <HomeSearch />
@@ -116,7 +116,7 @@ export default async function Home() {
           <div className="max-w-6xl mx-auto px-6">
             <div className="flex justify-between items-baseline mb-10">
               <h2 className="text-3xl md:text-5xl font-[700]">
-                This week's <span className="text-[#d6352b]">picks</span>
+                This week&aposs <span className="text-[#d6352b]">picks</span>
               </h2>
               <Link
                 href="/cars"
