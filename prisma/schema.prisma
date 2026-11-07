@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
 }
 
 datasource db {
@@ -68,10 +69,10 @@ enum CarStatus {
 // Single dealership configuration, if you have multiple dealerships, you can remove default values.
 model DealershipInfo {
   id           String        @id @default(uuid())
-  name         String        @default("CarsAi Motors")
-  address      String        @default("69 Car Street, Autoville, CA 69420") 
-  phone        String        @default("+1 (555) 123-4567")
-  email        String        @default("contact@CarsAi.com")
+  name         String        @default("CarsAi")
+  address      String        @default("Egypt Cairo") 
+  phone        String        @default("01009014597")
+  email        String        @default("mohnud0987@gmail.com")
   workingHours WorkingHour[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
