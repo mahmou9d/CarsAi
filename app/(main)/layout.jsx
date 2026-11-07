@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Footer";
 
+export const dynamic = "force-dynamic";
+
 export default function MainLayout({ children }) {
   return (
     <>

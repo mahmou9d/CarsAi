@@ -3,6 +3,8 @@ import { Sidebar } from "./admin/_components/sidebar";
 import { getAdmin } from "@/actions/admin";
 import Header from "@/components/Header";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({ children }) {
   const admin = await getAdmin();
 console.log(admin.authorized)
