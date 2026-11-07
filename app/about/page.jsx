@@ -160,6 +160,7 @@ export default function AboutPage() {
                   size="lg"
                   className="bg-white text-[#E4141B] hover:bg-white/90 rounded-full font-semibold gap-2"
                   asChild
+                  variant={undefined}
                 >
                   <Link href="/cars">
                     Browse cars <ArrowRight className="h-4 w-4" />
