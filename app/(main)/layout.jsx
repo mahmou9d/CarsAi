@@ -1,13 +1,4 @@
 import Header from "@/components/Header";
-import Link from "next/link";
-import {
-  Facebook,
-  Instagram,
-  Twitter,
-  Mail,
-  Phone,
-  MapPin,
-} from "lucide-react";
 import Footer from "@/components/Footer";
 
 export const dynamic = "force-dynamic";
