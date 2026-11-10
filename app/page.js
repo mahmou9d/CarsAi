@@ -12,7 +12,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { SignedOut } from "@clerk/nextjs";
+import { Show } from "@clerk/nextjs";
 import { getFeaturedCars } from "@/actions/home";
 import { CarCard } from "@/components/car-card";
 import { HomeSearch } from "@/components/home-search";
@@ -265,7 +265,7 @@ export default async function Home() {
                 >
                   <Link href="/cars">View all cars</Link>
                 </Button>
-                <SignedOut>
+                <Show when="signed-out">
                   <Button
                     size="lg"
                     variant="outline"
@@ -274,7 +274,7 @@ export default async function Home() {
                   >
                     <Link href="/sign-up">Create account</Link>
                   </Button>
-                </SignedOut>
+                </Show>
               </div>
             </div>
           </div>

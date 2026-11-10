@@ -9,7 +9,7 @@ import {
   LogInIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { checkUser } from "@/lib/checkUser";
 
 const Header = async ({ isAdminPage = false }) => {
@@ -75,7 +75,7 @@ const Header = async ({ isAdminPage = false }) => {
               </Button>
             </Link>
           ) : (
-            <SignedIn>
+            <Show when="signed-in">
               {!isAdmin && (
                 <Link href="/reservations">
                   <Button
@@ -111,10 +111,10 @@ const Header = async ({ isAdminPage = false }) => {
                   </Button>
                 </Link>
               )}
-            </SignedIn>
+            </Show>
           )}
 
-          <SignedOut>
+          <Show when="signed-out">
             {!isAdminPage && (
               <SignInButton forceRedirectUrl="/">
                 <Button
@@ -131,9 +131,9 @@ const Header = async ({ isAdminPage = false }) => {
                 </Button>
               </SignInButton>
             )}
-          </SignedOut>
+          </Show>
 
-          <SignedIn>
+          <Show when="signed-in">
             <UserButton
               appearance={{
                 elements: {
@@ -141,7 +141,7 @@ const Header = async ({ isAdminPage = false }) => {
                 },
               }}
             />
-          </SignedIn>
+          </Show>
         </div>
       </nav>
     </header>
