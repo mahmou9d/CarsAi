@@ -4,12 +4,6 @@ import {
   Search,
   CalendarCheck,
   ShieldCheck,
-  Facebook,
-  Instagram,
-  Twitter,
-  Mail,
-  Phone,
-  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +27,6 @@ export const dynamic = "force-dynamic";
 
 const archivo = Archivo({
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
 });
 
 const steps = [
