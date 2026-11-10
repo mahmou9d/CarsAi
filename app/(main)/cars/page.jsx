@@ -33,7 +33,7 @@ export default async function CarsPage() {
           {/* Filters Section */}
           <aside className="w-full lg:w-80 flex-shrink-0">
             <div className="lg:sticky lg:top-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <CarFilters filters={filtersData.data} />
+              <CarFilters filters={filtersData?.data || {}} />
             </div>
           </aside>
 

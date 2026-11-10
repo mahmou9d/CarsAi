@@ -67,7 +67,20 @@ export async function getCarFilters() {
       },
     };
   } catch (error) {
-    throw new Error("Error fetching car filters:" + error.message);
+    console.error("Error fetching car filters:", error);
+    return {
+      success: false,
+      data: {
+        makes: [],
+        bodyTypes: [],
+        fuelTypes: [],
+        transmissions: [],
+        priceRange: {
+          min: 0,
+          max: 100000,
+        },
+      },
+    };
   }
 }
 
@@ -188,7 +201,18 @@ export async function getCars({
       },
     };
   } catch (error) {
-    throw new Error("Error fetching cars:" + error.message);
+    console.error("Error fetching cars:", error);
+    return {
+      success: false,
+      data: [],
+      pagination: {
+        total: 0,
+        page,
+        limit,
+        pages: 0,
+      },
+      error: error.message,
+    };
   }
 }
 
