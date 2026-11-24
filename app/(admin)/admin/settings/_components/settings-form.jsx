@@ -1,6 +1,8 @@
+// @ts-nocheck
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   Save,
@@ -11,6 +13,12 @@ import {
   UserX,
   CheckCircle,
   Search,
+  Building,
+  MapPin,
+  Phone,
+  Mail,
+  ArrowRight,
+  Store,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -46,6 +54,7 @@ import useFetch from "@/hooks/use-fetch";
 import {
   getDealershipInfo,
   saveWorkingHours,
+  updateDealershipProfile,
   getUsers,
   updateUserRole,
 } from "@/actions/settings";
@@ -62,6 +71,12 @@ const DAYS = [
 ];
 
 export const SettingsForm = () => {
+  // Dealership Profile State
+  const [profileName, setProfileName] = useState("CarsAi");
+  const [profileAddress, setProfileAddress] = useState("Egypt Cairo");
+  const [profilePhone, setProfilePhone] = useState("01009014597");
+  const [profileEmail, setProfileEmail] = useState("mohnud0987@gmail.com");
+
   const [workingHours, setWorkingHours] = useState(
     DAYS.map((day) => ({
       dayOfWeek: day.value,
@@ -93,6 +108,13 @@ export const SettingsForm = () => {
   } = useFetch(saveWorkingHours);
 
   const {
+    loading: savingProfile,
+    fn: saveProfileFn,
+    data: profileResult,
+    error: profileError,
+  } = useFetch(updateDealershipProfile);
+
+  const {
     loading: fetchingUsers,
     fn: fetchUsers,
     data: usersData,
@@ -112,15 +134,18 @@ export const SettingsForm = () => {
     fetchUsers();
   }, []);
 
-  // Set working hours when settings data is fetched
+  // Set dealership details when fetched
   useEffect(() => {
     if (settingsData?.success && settingsData.data) {
       const dealership = settingsData.data;
+      if (dealership.name) setProfileName(dealership.name);
+      if (dealership.address) setProfileAddress(dealership.address);
+      if (dealership.phone) setProfilePhone(dealership.phone);
+      if (dealership.email) setProfileEmail(dealership.email);
 
-      // Map the working hours
-      if (dealership.workingHours.length > 0) {
+      // Map working hours
+      if (dealership.workingHours && dealership.workingHours.length > 0) {
         const mappedHours = DAYS.map((day) => {
-          // Find matching working hour
           const hourData = dealership.workingHours.find(
             (h) => h.dayOfWeek === day.value
           );
@@ -134,7 +159,6 @@ export const SettingsForm = () => {
             };
           }
 
-          // Default values if no working hour is found
           return {
             dayOfWeek: day.value,
             openTime: "09:00",
@@ -150,27 +174,22 @@ export const SettingsForm = () => {
 
   // Handle errors
   useEffect(() => {
-    if (settingsError) {
-      toast.error("Failed to load dealership settings");
-    }
-
-    if (saveError) {
-      toast.error(`Failed to save working hours: ${saveError.message}`);
-    }
-
-    if (usersError) {
-      toast.error("Failed to load users");
-    }
-
-    if (updateRoleError) {
-      toast.error(`Failed to update user role: ${updateRoleError.message}`);
-    }
-  }, [settingsError, saveError, usersError, updateRoleError]);
+    if (settingsError) toast.error("Failed to load dealership settings");
+    if (saveError) toast.error(`Failed to save working hours: ${saveError.message}`);
+    if (profileError) toast.error("Failed to save dealership profile");
+    if (usersError) toast.error("Failed to load users");
+    if (updateRoleError) toast.error(`Failed to update user role: ${updateRoleError.message}`);
+  }, [settingsError, saveError, profileError, usersError, updateRoleError]);
 
   // Handle successful operations
   useEffect(() => {
     if (saveResult?.success) {
       toast.success("Working hours saved successfully");
+      fetchDealershipInfo();
+    }
+
+    if (profileResult?.success) {
+      toast.success("Dealership profile updated successfully");
       fetchDealershipInfo();
     }
 
@@ -180,7 +199,7 @@ export const SettingsForm = () => {
       setConfirmAdminDialog(false);
       setConfirmRemoveDialog(false);
     }
-  }, [saveResult, updateRoleResult]);
+  }, [saveResult, profileResult, updateRoleResult]);
 
   // Handle working hours change
   const handleWorkingHourChange = (index, field, value) => {
@@ -195,6 +214,17 @@ export const SettingsForm = () => {
   // Save working hours
   const handleSaveHours = async () => {
     await saveHours(workingHours);
+  };
+
+  // Save profile
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    await saveProfileFn({
+      name: profileName,
+      address: profileAddress,
+      phone: profilePhone,
+      email: profileEmail,
+    });
   };
 
   // Make user admin
@@ -220,41 +250,160 @@ export const SettingsForm = () => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="hours">
-        <TabsList className="bg-slate-100">
+      <Tabs defaultValue="profile">
+        <TabsList className="bg-slate-100 p-1 rounded-xl">
+          <TabsTrigger
+            value="profile"
+            className="rounded-lg data-[state=active]:bg-[#E4141B] data-[state=active]:text-white text-xs sm:text-sm font-medium"
+          >
+            <Store className="h-4 w-4 mr-2" />
+            Dealership Profile
+          </TabsTrigger>
           <TabsTrigger
             value="hours"
-            className="data-[state=active]:bg-red-700 data-[state=active]:text-white"
+            className="rounded-lg data-[state=active]:bg-[#E4141B] data-[state=active]:text-white text-xs sm:text-sm font-medium"
           >
             <Clock className="h-4 w-4 mr-2" />
             Working Hours
           </TabsTrigger>
           <TabsTrigger
             value="admins"
-            className="data-[state=active]:bg-red-700 data-[state=active]:text-white"
+            className="rounded-lg data-[state=active]:bg-[#E4141B] data-[state=active]:text-white text-xs sm:text-sm font-medium"
           >
             <Shield className="h-4 w-4 mr-2" />
             Admin Users
           </TabsTrigger>
         </TabsList>
 
+        {/* ── Dealership Profile Tab ── */}
+        <TabsContent value="profile" className="space-y-6 mt-6">
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                <Building className="h-5 w-5 text-[#E4141B]" />
+                Showroom & Dealership Information
+              </CardTitle>
+              <CardDescription>
+                Configure the showroom brand name, location address, and official contact channels
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveProfile} className="space-y-4 max-w-2xl">
+                <div>
+                  <Label className="text-xs font-semibold text-slate-700">
+                    Dealership Brand Name
+                  </Label>
+                  <Input
+                    type="text"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    required
+                    placeholder="e.g. CarsAi Egypt"
+                    className="mt-1"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Displayed across header branding, customer quotes, and invoices
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="text-xs font-semibold text-slate-700">
+                    Physical Showroom Address
+                  </Label>
+                  <div className="relative mt-1">
+                    <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                    <Input
+                      type="text"
+                      value={profileAddress}
+                      onChange={(e) => setProfileAddress(e.target.value)}
+                      required
+                      placeholder="e.g. 15 El-Tahrir Street, Cairo, Egypt"
+                      className="pl-9"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Used for client navigation and test drive appointment locations
+                  </p>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Primary Contact Phone
+                    </Label>
+                    <div className="relative mt-1">
+                      <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                      <Input
+                        type="text"
+                        value={profilePhone}
+                        onChange={(e) => setProfilePhone(e.target.value)}
+                        required
+                        placeholder="e.g. +20 100 901 4597"
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Official Contact Email
+                    </Label>
+                    <div className="relative mt-1">
+                      <Mail className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                      <Input
+                        type="email"
+                        value={profileEmail}
+                        onChange={(e) => setProfileEmail(e.target.value)}
+                        required
+                        placeholder="e.g. contact@carsai.com"
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 flex justify-end">
+                  <Button
+                    type="submit"
+                    disabled={savingProfile}
+                    className="bg-[#E4141B] hover:bg-[#c81219] text-white"
+                  >
+                    {savingProfile ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving Profile...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Dealership Profile
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Working Hours Tab ── */}
         <TabsContent value="hours" className="space-y-6 mt-6">
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
               <CardTitle>Working Hours</CardTitle>
               <CardDescription>
-                Set your dealership's working hours for each day of the week.
+                Set your showroom's working hours for each day of the week to govern test drive booking slots.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {DAYS.map((day, index) => (
                   <div
                     key={day.value}
-                    className="grid grid-cols-12 gap-4 items-center py-3 px-4 rounded-lg hover:bg-red-50/40 transition-colors"
+                    className="grid grid-cols-12 gap-4 items-center py-2.5 px-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors"
                   >
                     <div className="col-span-3 md:col-span-2">
-                      <div className="font-medium text-slate-800">
+                      <div className="font-semibold text-slate-900 text-sm">
                         {day.label}
                       </div>
                     </div>
@@ -266,11 +415,10 @@ export const SettingsForm = () => {
                         onCheckedChange={(checked) => {
                           handleWorkingHourChange(index, "isOpen", checked);
                         }}
-                        className="data-[state=checked]:bg-red-700 data-[state=checked]:border-red-700"
                       />
                       <Label
                         htmlFor={`is-open-${day.value}`}
-                        className="ml-2 cursor-pointer"
+                        className="ml-2 cursor-pointer text-xs font-medium"
                       >
                         {workingHours[index]?.isOpen ? "Open" : "Closed"}
                       </Label>
@@ -280,7 +428,7 @@ export const SettingsForm = () => {
                       <>
                         <div className="col-span-5 md:col-span-4">
                           <div className="flex items-center">
-                            <Clock className="h-4 w-4 text-red-400 mr-2" />
+                            <Clock className="h-4 w-4 text-slate-400 mr-2" />
                             <Input
                               type="time"
                               value={workingHours[index]?.openTime}
@@ -291,12 +439,12 @@ export const SettingsForm = () => {
                                   e.target.value
                                 )
                               }
-                              className="text-sm focus-visible:ring-red-600"
+                              className="text-xs h-9"
                             />
                           </div>
                         </div>
 
-                        <div className="text-center col-span-1 text-slate-500">
+                        <div className="text-center col-span-1 text-slate-400 text-xs">
                           to
                         </div>
 
@@ -311,15 +459,15 @@ export const SettingsForm = () => {
                                 e.target.value
                               )
                             }
-                            className="text-sm focus-visible:ring-red-600"
+                            className="text-xs h-9"
                           />
                         </div>
                       </>
                     )}
 
                     {!workingHours[index]?.isOpen && (
-                      <div className="col-span-11 md:col-span-8 text-gray-500 italic text-sm">
-                        Closed all day
+                      <div className="col-span-11 md:col-span-8 text-slate-400 italic text-xs">
+                        Closed for walk-ins & appointments
                       </div>
                     )}
                   </div>
@@ -330,12 +478,12 @@ export const SettingsForm = () => {
                 <Button
                   onClick={handleSaveHours}
                   disabled={savingHours}
-                  className="bg-red-700 hover:bg-red-800 text-white"
+                  className="bg-[#E4141B] hover:bg-[#c81219] text-white"
                 >
                   {savingHours ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                      Saving Hours...
                     </>
                   ) : (
                     <>
@@ -349,21 +497,30 @@ export const SettingsForm = () => {
           </Card>
         </TabsContent>
 
+        {/* ── Admin Users Tab ── */}
         <TabsContent value="admins" className="space-y-6 mt-6">
           <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle>Admin Users</CardTitle>
-              <CardDescription>
-                Manage users with admin privileges.
-              </CardDescription>
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle>Admin Users & Staff</CardTitle>
+                <CardDescription>
+                  Manage accounts with administrative dealership access.
+                </CardDescription>
+              </div>
+              <Link href="/admin/users">
+                <Button variant="outline" size="sm" className="text-xs text-[#E4141B] border-red-200 hover:bg-red-50">
+                  Open Customer Directory
+                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent>
               <div className="mb-6 relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
                   type="search"
-                  placeholder="Search users..."
-                  className="pl-9 w-full focus-visible:ring-red-600"
+                  placeholder="Search staff and users..."
+                  className="pl-9 w-full"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                 />
@@ -371,7 +528,7 @@ export const SettingsForm = () => {
 
               {fetchingUsers ? (
                 <div className="py-12 flex justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+                  <Loader2 className="h-8 w-8 animate-spin text-[#E4141B]" />
                 </div>
               ) : usersData?.success && filteredUsers.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -388,31 +545,18 @@ export const SettingsForm = () => {
                       {filteredUsers.map((user) => (
                         <TableRow
                           key={user.id}
-                          className="hover:bg-red-50/40 transition-colors"
+                          className="hover:bg-red-50/20 transition-colors"
                         >
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                                {user.imageUrl ? (
-                                  <img
-                                    src={user.imageUrl}
-                                    alt={user.name || "User"}
-                                    className="w-full h-full object-scale-down"
-                                  />
-                                ) : (
-                                  <Users className="h-4 w-4 text-gray-500" />
-                                )}
-                              </div>
-                              <span>{user.name || "Unnamed User"}</span>
-                            </div>
+                          <TableCell className="font-semibold text-slate-900">
+                            {user.name || "Unnamed User"}
                           </TableCell>
-                          <TableCell>{user.email}</TableCell>
+                          <TableCell className="text-slate-600 text-xs">{user.email}</TableCell>
                           <TableCell>
                             <Badge
                               className={
                                 user.role === "ADMIN"
-                                  ? "bg-red-700 hover:bg-red-700"
-                                  : "bg-gray-800 hover:bg-gray-800"
+                                  ? "bg-red-100 text-red-800 hover:bg-red-100 border-0"
+                                  : "bg-slate-100 text-slate-800 hover:bg-slate-100 border-0"
                               }
                             >
                               {user.role}
@@ -423,28 +567,28 @@ export const SettingsForm = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                                className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
                                 onClick={() => {
                                   setUserToDemote(user);
                                   setConfirmRemoveDialog(true);
                                 }}
                                 disabled={updatingRole}
                               >
-                                <UserX className="h-4 w-4 mr-2" />
+                                <UserX className="h-3.5 w-3.5 mr-1.5" />
                                 Remove Admin
                               </Button>
                             ) : (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-700"
+                                className="border-red-200 text-red-700 hover:bg-red-50 text-xs"
                                 onClick={() => {
                                   setUserToPromote(user);
                                   setConfirmAdminDialog(true);
                                 }}
                                 disabled={updatingRole}
                               >
-                                <Shield className="h-4 w-4 mr-2" />
+                                <Shield className="h-3.5 w-3.5 mr-1.5" />
                                 Make Admin
                               </Button>
                             )}
@@ -455,18 +599,8 @@ export const SettingsForm = () => {
                   </Table>
                 </div>
               ) : (
-                <div className="py-12 text-center">
-                  <div className="h-16 w-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-                    <Users className="h-8 w-8 text-red-300" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-1">
-                    No users found
-                  </h3>
-                  <p className="text-gray-500">
-                    {userSearch
-                      ? "No users match your search criteria"
-                      : "There are no users registered yet"}
-                  </p>
+                <div className="py-12 text-center text-slate-400 text-sm">
+                  No users found
                 </div>
               )}
             </CardContent>
@@ -482,8 +616,8 @@ export const SettingsForm = () => {
                 <DialogTitle>Confirm Admin Privileges</DialogTitle>
                 <DialogDescription>
                   Are you sure you want to give admin privileges to{" "}
-                  {userToPromote?.name || userToPromote?.email}? Admin users can
-                  manage all aspects of the dealership.
+                  <strong>{userToPromote?.name || userToPromote?.email}</strong>? Admin users can
+                  manage all vehicles, pricing, test drives, and inquiries.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -497,7 +631,7 @@ export const SettingsForm = () => {
                 <Button
                   onClick={handleMakeAdmin}
                   disabled={updatingRole}
-                  className="bg-red-700 hover:bg-red-800 text-white"
+                  className="bg-[#E4141B] hover:bg-[#c81219] text-white"
                 >
                   {updatingRole ? (
                     <>
@@ -507,7 +641,7 @@ export const SettingsForm = () => {
                   ) : (
                     <>
                       <CheckCircle className="mr-2 h-4 w-4" />
-                      Confirm
+                      Confirm Admin
                     </>
                   )}
                 </Button>
@@ -525,8 +659,8 @@ export const SettingsForm = () => {
                 <DialogTitle>Remove Admin Privileges</DialogTitle>
                 <DialogDescription>
                   Are you sure you want to remove admin privileges from{" "}
-                  {userToDemote?.name || userToDemote?.email}? They will no
-                  longer be able to access the admin dashboard.
+                  <strong>{userToDemote?.name || userToDemote?.email}</strong>? They will no
+                  longer be able to access the admin portal.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -541,7 +675,7 @@ export const SettingsForm = () => {
                   variant="destructive"
                   onClick={handleRemoveAdmin}
                   disabled={updatingRole}
-                  className="bg-red-700 hover:bg-red-800"
+                  className="bg-[#E4141B] hover:bg-[#c81219]"
                 >
                   {updatingRole ? (
                     <>

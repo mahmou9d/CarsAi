@@ -1,13 +1,12 @@
 import { notFound } from "next/navigation";
 import { Sidebar } from "./admin/_components/sidebar";
+import { MobileHeader } from "./admin/_components/mobile-header";
 import { getAdmin } from "@/actions/admin";
-import Header from "@/components/Header";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }) {
   const admin = await getAdmin();
-console.log(admin.authorized)
   // If user not found in our db or not an admin, redirect to 404
   if (!admin.authorized) {
     return notFound();
@@ -15,10 +14,14 @@ console.log(admin.authorized)
 
   return (
     <div className="min-h-screen">
-      
-      <div className="hidden md:flex md:flex-col md:fixed md:inset-y-0  md:w-56 md:z-50">
+      {/* Mobile sticky top header with open button */}
+      <MobileHeader />
+
+      {/* Desktop fixed sidebar */}
+      <div className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-56 md:z-50">
         <Sidebar />
       </div>
+
       <main className="md:pl-56 min-h-screen">{children}</main>
     </div>
   );

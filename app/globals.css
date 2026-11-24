@@ -137,4 +137,17 @@
   background-size: 30px 30px;
 }
 
+@media print {
+  header,
+  aside,
+  button:not(.print-keep),
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
+
 

@@ -10,17 +10,21 @@ datasource db {
 }
 
 model User {
-  id            String             @id @default(uuid())
-  clerkUserId   String             @unique // clerk user id
-  email         String             @unique
-  name          String?
-  imageUrl      String?
-  phone         String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  role          UserRole           @default(USER)
-  savedCars     UserSavedCar[]
-  testDrives    TestDriveBooking[]
+  id              String             @id @default(uuid())
+  supabaseUserId  String?            @unique // supabase auth user id
+  clerkUserId     String?            @unique // legacy clerk user id
+  email           String             @unique
+  name            String?
+  imageUrl        String?
+  phone           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  role            UserRole           @default(USER)
+  savedCars       UserSavedCar[]
+  testDrives      TestDriveBooking[]
+  inquiries       CarInquiry[]
+  tradeInRequests TradeInRequest[]
+  serviceBookings ServiceBooking[]
 }
 
 enum UserRole {
@@ -46,6 +50,8 @@ model Car {
   images            String[]           // Array of Supabase storage URLs
   savedBy           UserSavedCar[]
   testDriveBookings TestDriveBooking[]
+  inquiries         CarInquiry[]
+  inspections       InspectionReport[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -147,3 +153,160 @@ enum BookingStatus {
   CANCELLED
   NO_SHOW
 }
+
+model CarInquiry {
+  id               String          @id @default(uuid())
+  carId            String?
+  car              Car?            @relation(fields: [carId], references: [id], onDelete: SetNull)
+  userId           String?
+  user             User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name             String
+  email            String
+  phone            String?
+  message          String
+  preferredContact String          @default("EMAIL")
+  status           InquiryStatus   @default(NEW)
+  adminNotes       String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([carId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  RESOLVED
+  CLOSED
+}
+
+model TradeInRequest {
+  id              String            @id @default(uuid())
+  referenceNumber String            @unique // e.g. APP-123456
+  userId          String?
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Customer Contact
+  fullName        String
+  email           String
+  phone           String
+  city            String?           @default("Cairo")
+
+  // Vehicle Information
+  make            String
+  model           String
+  year            Int
+  mileage         Int
+  condition       TradeInCondition  @default(GOOD)
+  notes           String?
+
+  // Algorithmic valuation estimate (at time of submission)
+  estimatedMarket Decimal?          @db.Decimal(10, 2)
+  instantCash     Decimal?          @db.Decimal(10, 2)
+  tradeInCredit   Decimal?          @db.Decimal(10, 2)
+
+  // Admin Review & Offer
+  status          TradeInStatus     @default(PENDING)
+  finalOffer      Decimal?          @db.Decimal(10, 2)
+  adminNotes      String?           // Message / explanation sent by dealer
+  clientDecision  String?           // "ACCEPTED" | "REJECTED" | null
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([phone])
+  @@index([referenceNumber])
+  @@index([createdAt])
+}
+
+enum TradeInCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum TradeInStatus {
+  PENDING       // قيد المراجعة
+  IN_REVIEW     // جاري الفحص والتقييم
+  OFFER_MADE    // تم تقديم عرض سعر
+  ACCEPTED      // تم قبول العرض من العميل
+  REJECTED      // مرفوض من العميل أو المعرض
+  COMPLETED     // تمت الصفقة واستلام السيارة
+}
+
+model ServiceBooking {
+  id              String            @id @default(uuid())
+  referenceNumber String            @unique // e.g. SRV-123456
+  userId          String?
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Customer Contact
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+
+  // Vehicle Information
+  carMake         String
+  carModel        String?
+  carYear         Int?
+
+  // Service Details
+  serviceType     String            // e.g. "Scheduled Maintenance", "150-Point Inspection", etc.
+  servicePackage  String?           // e.g. "10,000 Miles", "30,000 Miles", etc.
+  preferredDate   DateTime          @db.Date
+  preferredTime   String?           // "Morning", "Afternoon", or "10:00 AM"
+  notes           String?
+
+  // Workshop & Admin Tracking
+  status          ServiceStatus     @default(PENDING)
+  technicianName  String?
+  estimatedCost   Decimal?          @db.Decimal(10, 2)
+  finalCost       Decimal?          @db.Decimal(10, 2)
+  adminNotes      String?           // Notes or updates for customer
+  inspectionPassed Boolean?         @default(false)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([customerPhone])
+  @@index([referenceNumber])
+  @@index([preferredDate])
+}
+
+enum ServiceStatus {
+  PENDING          // قيد انتظار التأكيد
+  CONFIRMED        // موعد مؤكد ومجدول
+  IN_PROGRESS      // السيارة قيد الصيانة بالورشة
+  READY_FOR_PICKUP // جاهزة للاستلام
+  COMPLETED        // تم الانتهاء واستلام السيارة
+  CANCELLED        // تم الإلغاء
+}
+
+model InspectionReport {
+  id              String   @id @default(uuid())
+  carId           String
+  car             Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  inspectorName   String
+  score           Int
+  grade           String   // e.g. "Platinum", "Gold", "Silver", "Fair"
+  certification   String   // e.g. "CarsAi Certified Pre-Owned"
+  passedItems     Int      @default(0)
+  attentionItems  Int      @default(0)
+  failedItems     Int      @default(0)
+  checklistData   Json     // Full sections & item status & notes
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([carId])
+  @@index([createdAt])
+}
+

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/auth";
 import { db } from "@/lib/prisma";
 import { serializeCarData } from "@/lib/helpers";
 
@@ -17,15 +17,8 @@ export async function bookTestDrive({
 }) {
   try {
     // Authenticate user
-    const { userId } = await auth();
-    if (!userId) throw new Error("You must be logged in to book a test drive");
-
-    // Find user in our database
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
-    if (!user) throw new Error("User not found in database");
+    const { user } = await getAuth();
+    if (!user) throw new Error("You must be logged in to book a test drive");
 
     // Check if car exists and is available
     const car = await db.car.findUnique({
@@ -85,23 +78,11 @@ export async function bookTestDrive({
  */
 export async function getUserTestDrives() {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return {
-        success: false,
-        error: "Unauthorized",
-      };
-    }
-
-    // Get the user from our database
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
+    const { user } = await getAuth();
     if (!user) {
       return {
         success: false,
-        error: "User not found",
+        error: "Unauthorized",
       };
     }
 
@@ -146,23 +127,11 @@ export async function getUserTestDrives() {
  */
 export async function cancelTestDrive(bookingId) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return {
-        success: false,
-        error: "Unauthorized",
-      };
-    }
-
-    // Get the user from our database
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
+    const { user } = await getAuth();
     if (!user) {
       return {
         success: false,
-        error: "User not found",
+        error: "Unauthorized",
       };
     }
 

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/use-auth";
 import { AlertCircle, Calendar } from "lucide-react";
 import {
   Car,
@@ -15,6 +16,11 @@ import {
   Heart,
   MessageSquare,
   Currency,
+  ArrowLeftRight,
+  Printer,
+  Copy,
+  Check,
+  Maximize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,12 +38,40 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import EmiCalculator from "./emi-calculator";
+import { InquiryDialog } from "@/components/dialogs/inquiry-dialog";
+import { useCompare } from "@/hooks/use-compare";
+import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
+import { CarCard } from "@/components/cars/car-card";
+import { InspectionReportDialog } from "@/components/dialogs/inspection-dialog";
+import { CarReviewsSection } from "@/components/cars/car-reviews";
+import { CarLightbox } from "@/components/cars/car-lightbox";
+import { DeliveryEstimator } from "@/components/cars/delivery-estimator";
+import { ReserveCarDialog } from "@/components/dialogs/reserve-car-dialog";
+import { CarHistoryDialog } from "@/components/dialogs/car-history-dialog";
+import { WindowStickerDialog } from "@/components/dialogs/window-sticker-dialog";
+import { PriceAlertDialog } from "@/components/dialogs/price-alert-dialog";
+import { SimilarCarsSection } from "@/components/cars/similar-cars-section";
 
 export function CarDetails({ car, testDriveInfo }) {
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(car.wishlisted);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const { isInCompare, toggleCompare } = useCompare();
+  const isCompared = isInCompare(car.id);
+
+  const { recentlyViewed, addCarToRecent } = useRecentlyViewed();
+
+  // Track recently viewed
+  useEffect(() => {
+    if (car) {
+      addCarToRecent(car);
+    }
+  }, [car, addCarToRecent]);
 
   const {
     loading: savingCar,
@@ -113,15 +147,24 @@ export function CarDetails({ car, testDriveInfo }) {
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Image Gallery */}
         <div className="w-full lg:w-7/12">
-          <div className="aspect-video rounded-2xl overflow-hidden relative mb-4 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.25)]">
+          <div
+            onClick={() => car.images?.length > 0 && setLightboxOpen(true)}
+            className="aspect-video rounded-2xl overflow-hidden relative mb-4 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.25)] group cursor-pointer"
+          >
             {car.images && car.images.length > 0 ? (
-              <Image
-                src={car.images[currentImageIndex]}
-                alt={`${car.year} ${car.make} ${car.model}`}
-                fill
-                className="object-scale-down"
-                priority
-              />
+              <>
+                <Image
+                  src={car.images[currentImageIndex]}
+                  alt={`${car.year} ${car.make} ${car.model}`}
+                  fill
+                  className="object-scale-down group-hover:scale-105 transition-transform duration-300"
+                  priority
+                />
+                <div className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 backdrop-blur-sm transition">
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  <span>View Photos ({car.images.length})</span>
+                </div>
+              </>
             ) : (
               <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                 <Car className="h-24 w-24 text-gray-400" />
@@ -156,27 +199,54 @@ export function CarDetails({ car, testDriveInfo }) {
           )}
 
           {/* Secondary Actions */}
-          <div className="flex mt-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
             <Button
               variant="outline"
-              className={`flex items-center gap-2 flex-1 rounded-full ${
-                isWishlisted ? "text-[#E4141B] border-[#E4141B]/40" : ""
+              size="sm"
+              className={`flex items-center justify-center gap-1.5 rounded-full text-xs ${
+                isWishlisted ? "text-[#E4141B] border-[#E4141B]/40 bg-red-50/40" : ""
               }`}
               onClick={handleSaveCar}
               disabled={savingCar}
             >
               <Heart
-                className={`h-5 w-5 ${isWishlisted ? "fill-[#E4141B]" : ""}`}
+                className={`h-4 w-4 ${isWishlisted ? "fill-[#E4141B]" : ""}`}
               />
-              {isWishlisted ? "Saved" : "Save"}
+              <span>{isWishlisted ? "Saved" : "Save"}</span>
             </Button>
+
             <Button
               variant="outline"
-              className="flex items-center gap-2 flex-1 rounded-full"
-              onClick={handleShare}
+              size="sm"
+              className={`flex items-center justify-center gap-1.5 rounded-full text-xs transition-colors ${
+                isCompared
+                  ? "text-white bg-[#E4141B] hover:bg-[#c81219] hover:text-white border-[#E4141B]"
+                  : ""
+              }`}
+              onClick={() => toggleCompare(car)}
             >
-              <Share2 className="h-5 w-5" />
-              Share
+              <ArrowLeftRight className="h-4 w-4" />
+              <span>{isCompared ? "In Compare" : "Compare"}</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center justify-center gap-1.5 rounded-full text-xs"
+              onClick={() => setShareDialogOpen(true)}
+            >
+              <Share2 className="h-4 w-4" />
+              <span>Share</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center justify-center gap-1.5 rounded-full text-xs"
+              onClick={() => window.print()}
+            >
+              <Printer className="h-4 w-4" />
+              <span>Print</span>
             </Button>
           </div>
         </div>
@@ -242,6 +312,18 @@ export function CarDetails({ car, testDriveInfo }) {
             </DialogContent>
           </Dialog>
 
+          {/* 150-Point Certified Inspection & Vehicle History */}
+          <div className="my-4 space-y-2.5">
+            <InspectionReportDialog car={car} />
+            <CarHistoryDialog car={car} />
+          </div>
+
+          {/* Window Sticker + Price Alert */}
+          <div className="grid grid-cols-2 gap-2 my-3">
+            <WindowStickerDialog car={car} />
+            <PriceAlertDialog car={car} />
+          </div>
+
           {/* Request More Info */}
           <Card className="my-6 rounded-2xl border-0 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.2)]">
             <CardContent className="p-4">
@@ -253,11 +335,7 @@ export function CarDetails({ car, testDriveInfo }) {
                 Our representatives are available to answer all your queries
                 about this vehicle.
               </p>
-              <a href="mailto:mohnud">
-                <Button variant="outline" className="w-full rounded-full">
-                  Request Info
-                </Button>
-              </a>
+              <InquiryDialog car={car} />
             </CardContent>
           </Card>
 
@@ -270,22 +348,31 @@ export function CarDetails({ car, testDriveInfo }) {
             </Alert>
           )}
 
-          {/* Book Test Drive Button */}
+          {/* Primary Action Buttons: Hold with Deposit & Test Drive */}
           {car.status !== "SOLD" && car.status !== "UNAVAILABLE" && (
-            <Button
-              className="w-full py-6 text-lg rounded-full bg-[#E4141B] hover:bg-[#c81219] text-white"
-              onClick={handleBookTestDrive}
-              disabled={testDriveInfo.userTestDrive}
-            >
-              <Calendar className="mr-2 h-5 w-5" />
-              {testDriveInfo.userTestDrive
-                ? `Booked for ${format(
-                    new Date(testDriveInfo.userTestDrive.bookingDate),
-                    "EEEE, MMMM d, yyyy",
-                  )}`
-                : "Book Test Drive"}
-            </Button>
+            <div className="space-y-2.5">
+              <ReserveCarDialog car={car} />
+              <Button
+                variant="outline"
+                className="w-full py-6 text-base font-bold rounded-full border-slate-300 hover:border-[#E4141B] hover:text-[#E4141B] text-slate-800"
+                onClick={handleBookTestDrive}
+                disabled={testDriveInfo.userTestDrive}
+              >
+                <Calendar className="mr-2 h-5 w-5 text-[#E4141B]" />
+                {testDriveInfo.userTestDrive
+                  ? `Booked for ${format(
+                      new Date(testDriveInfo.userTestDrive.bookingDate),
+                      "EEEE, MMMM d, yyyy",
+                    )}`
+                  : "Schedule Free Test Drive"}
+              </Button>
+            </div>
           )}
+
+          {/* Nationwide Home Delivery Estimator */}
+          <div className="mt-4">
+            <DeliveryEstimator />
+          </div>
         </div>
       </div>
 
@@ -461,6 +548,113 @@ export function CarDetails({ car, testDriveInfo }) {
           </div>
         </div>
       </div>
+
+      {/* Customer Reviews & Ratings */}
+      <CarReviewsSection car={car} />
+
+      {/* Share Dialog */}
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share this car</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center gap-2 border rounded-full p-1.5 pl-4 bg-slate-50">
+              <span className="text-xs text-slate-600 truncate flex-1">
+                {typeof window !== "undefined" ? window.location.href : ""}
+              </span>
+              <Button
+                size="sm"
+                className="rounded-full bg-[#E4141B] hover:bg-[#c81219] text-white text-xs gap-1"
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  setCopied(true);
+                  toast.success("Link copied!");
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copied" : "Copy Link"}
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full gap-2 text-xs"
+                onClick={() => {
+                  const url = encodeURIComponent(window.location.href);
+                  const text = encodeURIComponent(`Check out this ${car.year} ${car.make} ${car.model} on CarsAi!`);
+                  window.open(`https://api.whatsapp.com/send?text=${text}%20${url}`, "_blank");
+                }}
+              >
+                WhatsApp
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full gap-2 text-xs"
+                onClick={() => {
+                  const url = encodeURIComponent(window.location.href);
+                  const text = encodeURIComponent(`Check out this ${car.year} ${car.make} ${car.model} on CarsAi!`);
+                  window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
+                }}
+              >
+                X (Twitter)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full gap-2 text-xs"
+                onClick={() => {
+                  const url = encodeURIComponent(window.location.href);
+                  window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank");
+                }}
+              >
+                Facebook
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Recently Viewed Cars */}
+      {recentlyViewed.filter((c) => c.id !== car.id).length > 0 && (
+        <div className="mt-14 pt-8 border-t border-slate-200">
+          <div className="flex justify-between items-baseline mb-6">
+            <h2 className="text-2xl font-bold">
+              Recently <span className="text-[#E4141B]">Viewed</span>
+            </h2>
+            <Link
+              href="/cars"
+              className="text-sm font-semibold text-[#E4141B] hover:underline"
+            >
+              Browse more
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {recentlyViewed
+              .filter((c) => c.id !== car.id)
+              .slice(0, 4)
+              .map((recentCar) => (
+                <CarCard key={recentCar.id} car={recentCar} />
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Full-Screen Car Photo Lightbox & 360 Tour */}
+      <CarLightbox
+        images={car.images || []}
+        initialIndex={currentImageIndex}
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        carTitle={`${car.year} ${car.make} ${car.model}`}
+      />
+
+      {/* Similar Cars Recommendation */}
+      <SimilarCarsSection car={car} />
     </div>
   );
 }

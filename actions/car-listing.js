@@ -2,7 +2,7 @@
 
 import { serializeCarData } from "@/lib/helpers";
 import { db } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -101,15 +101,7 @@ export async function getCars({
 }) {
   try {
     // Get current user if authenticated
-    const { userId } = await auth();
-    let dbUser = null;
-
-    if (userId) {
-      dbUser = await db.user.findUnique({
-        //one
-        where: { clerkUserId: userId },
-      });
-    }
+    const { user: dbUser } = await getAuth();
 
     // Build where conditions
     let where = {
@@ -221,14 +213,8 @@ export async function getCars({
  */
 export async function toggleSavedCar(carId) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
-
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
-    if (!user) throw new Error("User not found");
+    const { user } = await getAuth();
+    if (!user) throw new Error("Unauthorized");
 
     // Check if car exists
     const car = await db.car.findUnique({
@@ -298,14 +284,7 @@ export async function toggleSavedCar(carId) {
 export async function getCarById(carId) {
   try {
     // Get current user if authenticated
-    const { userId } = await auth();
-    let dbUser = null;
-
-    if (userId) {
-      dbUser = await db.user.findUnique({
-        where: { clerkUserId: userId },
-      });
-    }
+    const { user: dbUser } = await getAuth();
 
     // Get car details
     const car = await db.car.findUnique({
@@ -337,26 +316,26 @@ export async function getCarById(carId) {
     }
 
     // Check if user has already booked a test drive for this car
-    const existingTestDrive = await db.testDriveBooking.findFirst({
-      // هات أول سجل ينطبق عليه الشرط، حسب الترتيب اللي أنا محدده
-      where: {
-        carId,
-        userId: dbUser.id,
-        status: { in: ["PENDING", "CONFIRMED", "COMPLETED"] },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
     let userTestDrive = null;
+    if (dbUser) {
+      const existingTestDrive = await db.testDriveBooking.findFirst({
+        where: {
+          carId,
+          userId: dbUser.id,
+          status: { in: ["PENDING", "CONFIRMED", "COMPLETED"] },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
-    if (existingTestDrive) {
-      userTestDrive = {
-        id: existingTestDrive.id,
-        status: existingTestDrive.status,
-        bookingDate: existingTestDrive.bookingDate.toISOString(),
-      };
+      if (existingTestDrive) {
+        userTestDrive = {
+          id: existingTestDrive.id,
+          status: existingTestDrive.status,
+          bookingDate: existingTestDrive.bookingDate.toISOString(),
+        };
+      }
     }
 
     // Get dealership info for test drive availability
@@ -398,23 +377,11 @@ export async function getCarById(carId) {
  */
 export async function getSavedCars() {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return {
-        success: false,
-        error: "Unauthorized",
-      };
-    }
-
-    // Get the user from our database
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
+    const { user } = await getAuth();
     if (!user) {
       return {
         success: false,
-        error: "User not found",
+        error: "Unauthorized",
       };
     }
 

@@ -1,50 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Car,
-  Calendar,
-  TrendingUp,
-  Info,
-  CheckCircle,
-  Clock,
-  XCircle,
-  DollarSign,
-} from "lucide-react";
+import { Info, Calculator } from "lucide-react";
 
-// Safe percentage helper — avoids NaN / Infinity when the denominator is 0
-const pct = (numerator, denominator, digits = 1) => {
-  if (!denominator) return "0";
-  return ((numerator / denominator) * 100).toFixed(digits);
-};
+import { DashboardHeader } from "./dashboard/dashboard-header";
+import { OverviewTab } from "./dashboard/tabs/overview-tab";
+import { TrendsTab } from "./dashboard/tabs/trends-tab";
+import { FinancialsTab } from "./dashboard/tabs/financials-tab";
+import { InventoryTab } from "./dashboard/tabs/inventory-tab";
+import { TestDrivesTab } from "./dashboard/tabs/test-drives-tab";
+import { LeadsTab } from "./dashboard/tabs/leads-tab";
+import { ActivityTab } from "./dashboard/tabs/activity-tab";
+import { DealCalculatorWidget } from "./dashboard/widgets/deal-calculator";
 
-// Reusable status bar row (label, count, percentage bar)
-function StatusBar({ label, value, total, colorClass }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between text-sm">
-        <span>{label}</span>
-        <span className="font-medium">
-          {value} ({pct(value, total)}%)
-        </span>
-      </div>
-      <div className="w-full bg-gray-200 rounded-full h-2.5">
-        <div
-          className={`${colorClass} h-2.5 rounded-full`}
-          style={{ width: `${total ? (value / total) * 100 : 0}%` }}
-        />
-      </div>
-    </div>
-  );
-}
+// Re-export subcomponents for backward compatibility
+export * from "./dashboard/ui-elements";
+export { DealCalculatorWidget } from "./dashboard/widgets/deal-calculator";
+export { MonthlyGrowthChart } from "./dashboard/widgets/growth-chart";
+export { TopDemandedInventoryCard } from "./dashboard/widgets/top-demanded-cars";
+export { InventoryAgingWidget } from "./dashboard/widgets/inventory-aging";
+export { WishlistDemandWidget } from "./dashboard/widgets/wishlist-demand";
+export { ShowroomStatusWidget } from "./dashboard/widgets/showroom-status";
 
 export function Dashboard({ initialData }) {
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Show error if data fetch failed
   if (!initialData || !initialData.success) {
     return (
       <Alert variant="destructive">
@@ -57,305 +39,251 @@ export function Dashboard({ initialData }) {
     );
   }
 
-  const { cars, testDrives } = initialData.data;
+  const {
+    cars = { total: 0, available: 0, sold: 0, unavailable: 0, featured: 0 },
+    testDrives = {
+      total: 0,
+      pending: 0,
+      confirmed: 0,
+      completed: 0,
+      cancelled: 0,
+      noShow: 0,
+      conversionRate: 0,
+    },
+    financials = { inventoryValuation: 0, totalSalesVolume: 0, avgPrice: 0 },
+    makesBreakdown = [],
+    bodyTypesBreakdown = [],
+    fuelBreakdown = [],
+    transmissionBreakdown = [],
+    priceTiers = [],
+    mileageTiers = [],
+    monthlyTrends = [],
+    topDemandedCars = [],
+    inventoryAging = {},
+    wishlistDemand = {},
+    availableCarsList = [],
+    dealership = null,
+    inquiries = { total: 0, new: 0, contacted: 0, resolved: 0 },
+    recentActivity = { cars: [], testDrives: [], inquiries: [] },
+    tradeIns = { total: 0, pending: 0, inReview: 0, offerMade: 0, accepted: 0, completed: 0 },
+    services = { total: 0, pending: 0, confirmed: 0, inProgress: 0, ready: 0, completed: 0 },
+  } = initialData.data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* ── Top Header & Alert Banner ── */}
+      <DashboardHeader
+        inquiries={inquiries}
+        financials={financials}
+        cars={cars}
+        inventoryAging={inventoryAging}
+        testDrives={testDrives}
+        wishlistDemand={wishlistDemand}
+        makesBreakdown={makesBreakdown}
+        bodyTypesBreakdown={bodyTypesBreakdown}
+        fuelBreakdown={fuelBreakdown}
+        transmissionBreakdown={transmissionBreakdown}
+        tradeIns={tradeIns}
+        services={services}
+      />
+
       <Tabs
         defaultValue="overview"
         value={activeTab}
         onValueChange={setActiveTab}
+        className="w-full"
       >
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="test-drives">Test drives</TabsTrigger>
-        </TabsList>
+        {/* ── Navigation Tabs ── */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <TabsList className="bg-slate-100/80 p-1 rounded-xl flex-wrap h-auto gap-0.5">
+            <TabsTrigger
+              value="overview"
+              className="rounded-lg text-xs sm:text-sm font-medium"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger
+              value="trends"
+              className="rounded-lg text-xs sm:text-sm font-medium"
+            >
+              Trends & Growth
+            </TabsTrigger>
+            <TabsTrigger
+              value="calculator"
+              className="rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5"
+            >
+              <Calculator className="h-3.5 w-3.5 text-emerald-600" />
+              Deal Calculator
+            </TabsTrigger>
+            <TabsTrigger
+              value="financials"
+              className="rounded-lg text-xs sm:text-sm font-medium"
+            >
+              Financials
+            </TabsTrigger>
+            <TabsTrigger
+              value="inventory"
+              className="rounded-lg text-xs sm:text-sm font-medium"
+            >
+              Inventory & Aging
+            </TabsTrigger>
+            <TabsTrigger
+              value="test-drives"
+              className="rounded-lg text-xs sm:text-sm font-medium"
+            >
+              Test Drives
+            </TabsTrigger>
+            <TabsTrigger
+              value="leads"
+              className="rounded-lg text-xs sm:text-sm font-medium relative"
+            >
+              Leads & CRM
+              {inquiries.new > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-blue-600 text-white text-[9px] font-bold px-1">
+                  {inquiries.new}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="trade-ins"
+              className="rounded-lg text-xs sm:text-sm font-medium relative"
+            >
+              Trade-Ins
+              {(tradeIns.pending + tradeIns.inReview) > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-orange-500 text-white text-[9px] font-bold px-1">
+                  {tradeIns.pending + tradeIns.inReview}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="services"
+              className="rounded-lg text-xs sm:text-sm font-medium relative"
+            >
+              Services
+              {(services.pending + services.inProgress + services.ready) > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-teal-600 text-white text-[9px] font-bold px-1">
+                  {services.pending + services.inProgress + services.ready}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="activity"
+              className="rounded-lg text-xs sm:text-sm font-medium"
+            >
+              Activity
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          {/* KPI Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total cars
-                </CardTitle>
-                <Car className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{cars.total}</div>
-                <p className="text-xs text-muted-foreground">
-                  {cars.available} available, {cars.sold} sold
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Test drives
-                </CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{testDrives.total}</div>
-                <p className="text-xs text-muted-foreground">
-                  {testDrives.pending} pending, {testDrives.confirmed} confirmed
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Conversion rate
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {testDrives.conversionRate}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  From test drives to sales
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Cars sold</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{cars.sold}</div>
-                <p className="text-xs text-muted-foreground">
-                  {pct(cars.sold, cars.total)}% of inventory
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Additional Overview Content */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Dealership summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-medium text-sm mb-2">Car inventory</h3>
-                    <div className="flex items-center">
-                      <div className="w-full bg-gray-200 rounded-full h-2.5">
-                        <div
-                          className="bg-red-600 h-2.5 rounded-full"
-                          style={{
-                            width: `${
-                              cars.total ? (cars.available / cars.total) * 100 : 0
-                            }%`,
-                          }}
-                        />
-                      </div>
-                      <span className="ml-2 text-sm">
-                        {pct(cars.available, cars.total, 0)}%
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Available inventory capacity
-                    </p>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-medium text-sm mb-2">
-                      Test drive success
-                    </h3>
-                    <div className="flex items-center">
-                      <div className="w-full bg-gray-200 rounded-full h-2.5">
-                        <div
-                          className="bg-red-400 h-2.5 rounded-full"
-                          style={{
-                            width: `${
-                              testDrives.total
-                                ? (testDrives.completed / testDrives.total) * 100
-                                : 0
-                            }%`,
-                          }}
-                        />
-                      </div>
-                      <span className="ml-2 text-sm">
-                        {pct(testDrives.completed, testDrives.total, 0)}%
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Completed test drives
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 mt-6">
-                  <div className="text-center">
-                    <span className="text-3xl font-bold text-red-600">
-                      {cars.sold}
-                    </span>
-                    <p className="text-sm text-gray-600 mt-1">Cars sold</p>
-                  </div>
-                  <div className="text-center">
-                    <span className="text-3xl font-bold text-amber-600">
-                      {testDrives.pending + testDrives.confirmed}
-                    </span>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Upcoming test drives
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <span className="text-3xl font-bold text-green-600">
-                      {pct(cars.available, cars.total, 0)}%
-                    </span>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Inventory utilization
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Tab 1: Overview */}
+        <TabsContent value="overview" className="pt-4">
+          <OverviewTab
+            cars={cars}
+            testDrives={testDrives}
+            financials={financials}
+            inquiries={inquiries}
+            dealership={dealership}
+            topDemandedCars={topDemandedCars}
+          />
         </TabsContent>
 
-        {/* Test Drives Tab */}
-        <TabsContent value="test-drives" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total bookings
-                </CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{testDrives.total}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending</CardTitle>
-                <Clock className="h-4 w-4 text-amber-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{testDrives.pending}</div>
-                <p className="text-xs text-muted-foreground">
-                  {pct(testDrives.pending, testDrives.total)}% of bookings
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Confirmed</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{testDrives.confirmed}</div>
-                <p className="text-xs text-muted-foreground">
-                  {pct(testDrives.confirmed, testDrives.total)}% of bookings
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Completed</CardTitle>
-                <CheckCircle className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{testDrives.completed}</div>
-                <p className="text-xs text-muted-foreground">
-                  {pct(testDrives.completed, testDrives.total)}% of bookings
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Cancelled</CardTitle>
-                <XCircle className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{testDrives.cancelled}</div>
-                <p className="text-xs text-muted-foreground">
-                  {pct(testDrives.cancelled, testDrives.total)}% of bookings
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Tab 2: Trends & Growth */}
+        <TabsContent value="trends" className="pt-4">
+          <TrendsTab
+            monthlyTrends={monthlyTrends}
+            topDemandedCars={topDemandedCars}
+            wishlistDemand={wishlistDemand}
+          />
+        </TabsContent>
 
-          {/* Test Drive Status Visualization */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Test drive statistics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  {/* Conversion Rate Card */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-medium mb-2">
-                      Conversion rate
-                    </h3>
-                    <div className="text-3xl font-bold text-red-600">
-                      {testDrives.conversionRate}%
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Test drives resulting in car purchases
-                    </p>
-                  </div>
+        {/* Tab 3: Deal Calculator */}
+        <TabsContent value="calculator" className="pt-4">
+          <DealCalculatorWidget availableCars={availableCarsList} />
+        </TabsContent>
 
-                  {/* Test Drive Success Rate */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-medium mb-2">
-                      Completion rate
-                    </h3>
-                    <div className="text-3xl font-bold text-green-600">
-                      {pct(testDrives.completed, testDrives.total)}%
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Test drives successfully completed
-                    </p>
-                  </div>
-                </div>
+        {/* Tab 4: Financials */}
+        <TabsContent value="financials" className="pt-4">
+          <FinancialsTab
+            financials={financials}
+            cars={cars}
+            priceTiers={priceTiers}
+            mileageTiers={mileageTiers}
+          />
+        </TabsContent>
 
-                {/* Status Breakdown */}
-                <div className="space-y-4 mt-4">
-                  <h3 className="font-medium">Booking status breakdown</h3>
+        {/* Tab 5: Inventory & Aging */}
+        <TabsContent value="inventory" className="pt-4">
+          <InventoryTab
+            cars={cars}
+            inventoryAging={inventoryAging}
+            bodyTypesBreakdown={bodyTypesBreakdown}
+            makesBreakdown={makesBreakdown}
+            fuelBreakdown={fuelBreakdown}
+            transmissionBreakdown={transmissionBreakdown}
+          />
+        </TabsContent>
 
-                  <StatusBar
-                    label="Pending"
-                    value={testDrives.pending}
-                    total={testDrives.total}
-                    colorClass="bg-amber-500"
-                  />
-                  <StatusBar
-                    label="Confirmed"
-                    value={testDrives.confirmed}
-                    total={testDrives.total}
-                    colorClass="bg-green-500"
-                  />
-                  <StatusBar
-                    label="Completed"
-                    value={testDrives.completed}
-                    total={testDrives.total}
-                    colorClass="bg-red-600"
-                  />
-                  <StatusBar
-                    label="Cancelled"
-                    value={testDrives.cancelled}
-                    total={testDrives.total}
-                    colorClass="bg-red-400"
-                  />
-                  <StatusBar
-                    label="No show"
-                    value={testDrives.noShow}
-                    total={testDrives.total}
-                    colorClass="bg-gray-500"
-                  />
-                </div>
+        {/* Tab 6: Test Drives */}
+        <TabsContent value="test-drives" className="pt-4">
+          <TestDrivesTab testDrives={testDrives} cars={cars} />
+        </TabsContent>
+
+        {/* Tab 7: Leads & CRM */}
+        <TabsContent value="leads" className="pt-4">
+          <LeadsTab inquiries={inquiries} testDrives={testDrives} />
+        </TabsContent>
+
+        {/* Tab 8: Recent Activity */}
+        <TabsContent value="activity" className="pt-4">
+          <ActivityTab recentActivity={recentActivity} />
+        </TabsContent>
+
+        {/* Tab 9: Trade-Ins summary */}
+        <TabsContent value="trade-ins" className="pt-4">
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              { label: "Total", value: tradeIns.total, color: "slate" },
+              { label: "Pending", value: tradeIns.pending, color: "amber" },
+              { label: "In Review", value: tradeIns.inReview, color: "blue" },
+              { label: "Offer Made", value: tradeIns.offerMade, color: "purple" },
+              { label: "Accepted", value: tradeIns.accepted, color: "emerald" },
+              { label: "Completed", value: tradeIns.completed, color: "emerald" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className={`rounded-xl border border-${color}-200 bg-${color}-50/40 p-4 text-center shadow-sm`}>
+                <div className={`text-3xl font-black text-${color}-700`}>{value}</div>
+                <div className={`text-xs text-${color}-600 mt-1 font-medium uppercase`}>{label}</div>
               </div>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <a href="/admin/trade-ins" className="inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:underline">
+              Manage All Trade-In Requests →
+            </a>
+          </div>
+        </TabsContent>
+
+        {/* Tab 10: Services summary */}
+        <TabsContent value="services" className="pt-4">
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              { label: "Total", value: services.total, color: "slate" },
+              { label: "Pending", value: services.pending, color: "amber" },
+              { label: "Confirmed", value: services.confirmed, color: "blue" },
+              { label: "In Progress", value: services.inProgress, color: "purple" },
+              { label: "Ready", value: services.ready, color: "teal" },
+              { label: "Completed", value: services.completed, color: "emerald" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className={`rounded-xl border border-${color}-200 bg-${color}-50/40 p-4 text-center shadow-sm`}>
+                <div className={`text-3xl font-black text-${color}-700`}>{value}</div>
+                <div className={`text-xs text-${color}-600 mt-1 font-medium uppercase`}>{label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <a href="/admin/services" className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-600 hover:underline">
+              Manage All Service Bookings →
+            </a>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

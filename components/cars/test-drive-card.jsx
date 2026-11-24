@@ -7,6 +7,7 @@ import Image from "next/image";
 import { format, parseISO } from "date-fns";
 import {
   Calendar,
+  CalendarPlus,
   Car,
   Clock,
   User,
@@ -32,6 +33,27 @@ const formatTime = (timeString) => {
     return format(parseISO(`2025-01-01T${timeString}`), "h:mm a");
   } catch (error) {
     return timeString;
+  }
+};
+
+// Helper to create Google Calendar link
+const createGoogleCalendarUrl = (booking) => {
+  try {
+    const dateStr = format(new Date(booking.bookingDate), "yyyyMMdd");
+    const startTimeClean = (booking.startTime || "10:00").replace(":", "") + "00";
+    const endTimeClean = booking.endTime
+      ? booking.endTime.replace(":", "") + "00"
+      : startTimeClean;
+    const title = encodeURIComponent(
+      `Test Drive: ${booking.car?.year} ${booking.car?.make} ${booking.car?.model}`
+    );
+    const details = encodeURIComponent(
+      `CarsAi Test Drive booking. Status: ${booking.status}. Please bring your valid driver license.`
+    );
+    const location = encodeURIComponent("CarsAi Motors Showroom, Cairo, Egypt");
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateStr}T${startTimeClean}/${dateStr}T${endTimeClean}&details=${details}&location=${location}`;
+  } catch {
+    return "#";
   }
 };
 
@@ -178,6 +200,24 @@ export function TestDriveCard({
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
+              {(booking.status === "PENDING" ||
+                booking.status === "CONFIRMED") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full my-2 sm:mb-0 rounded-full border-slate-200 text-slate-700 hover:text-emerald-700 hover:border-emerald-300 gap-1.5"
+                  asChild
+                >
+                  <a
+                    href={createGoogleCalendarUrl(booking)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <CalendarPlus className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Add to Calendar</span>
+                  </a>
+                </Button>
+              )}
               {(booking.status === "PENDING" ||
                 booking.status === "CONFIRMED") && (
                 <Button

@@ -5,8 +5,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/prisma";
-import { createClient } from "@/lib/supabase";
-import { auth } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/auth";
 import { serializeCarData } from "@/lib/helpers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -139,14 +138,8 @@ export async function processCarImageWithAI(file) {
 // Add a car to the database with images
 export async function addCar({ carData, images }) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
-
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
-    if (!user) throw new Error("User not found");
+    const { user } = await getAuth();
+    if (!user) throw new Error("Unauthorized");
 
     // Create a unique folder name for this car's images
     const carId = uuidv4();
@@ -229,11 +222,19 @@ export async function addCar({ carData, images }) {
   }
 }
 
-// Fetch all cars with simple search
-export async function getCars(search = "") {
+// Fetch all cars with simple search or filters
+export async function getCars(query = "") {
   try {
+    const search = typeof query === "string" ? query : query?.search || "";
+    const status = typeof query === "object" ? query?.status : "";
+    const sortBy = typeof query === "object" ? query?.sortBy || "newest" : "newest";
+
     // Build where conditions
     let where = {};
+
+    if (status && status !== "ALL") {
+      where.status = status;
+    }
 
     // Add search filter
     if (search) {
@@ -244,13 +245,19 @@ export async function getCars(search = "") {
       ];
     }
 
+    // Determine orderBy
+    let orderBy = { createdAt: "desc" };
+    if (sortBy === "oldest") orderBy = { createdAt: "asc" };
+    else if (sortBy === "priceAsc") orderBy = { price: "asc" };
+    else if (sortBy === "priceDesc") orderBy = { price: "desc" };
+    else if (sortBy === "yearDesc") orderBy = { year: "desc" };
+    else if (sortBy === "mileageAsc") orderBy = { mileage: "asc" };
+
     // Execute main query
     const cars = await db.car.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy,
     });
-
-    // cars.map((car) => serializeCarData(car));
 
     const serializedCars = cars.map(serializeCarData);
 
@@ -270,8 +277,8 @@ export async function getCars(search = "") {
 // Delete a car by ID
 export async function deleteCar(id) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const { user } = await getAuth();
+    if (!user || user.role !== "ADMIN") throw new Error("Unauthorized");
 
     // First, fetch the car to get its images
     const car = await db.car.findUnique({
@@ -344,8 +351,8 @@ export async function deleteCar(id) {
 // Update car status or featured status
 export async function updateCarStatus(id, { status, featured }) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const { user } = await getAuth();
+    if (!user || user.role !== "ADMIN") throw new Error("Unauthorized");
 
     const updateData = {};
 
@@ -375,5 +382,331 @@ export async function updateCarStatus(id, { status, featured }) {
       success: false,
       error: error.message,
     };
+  }
+}
+
+// Get car by ID for admin edit
+export async function getCarByIdAdmin(id) {
+  try {
+    const { user } = await getAuth();
+    if (!user || user.role !== "ADMIN") {
+      throw new Error("Admin privileges required");
+    }
+
+    const car = await db.car.findUnique({
+      where: { id },
+    });
+
+    if (!car) {
+      return {
+        success: false,
+        error: "Car not found",
+      };
+    }
+
+    return {
+      success: true,
+      data: serializeCarData(car),
+    };
+  } catch (error) {
+    console.error("Error fetching car for edit:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+// Update complete car details
+export async function updateCar({ id, carData, existingImages = [], newImages = [] }) {
+  try {
+    const { user } = await getAuth();
+    if (!user || user.role !== "ADMIN") {
+      throw new Error("Admin privileges required");
+    }
+
+    const existingCar = await db.car.findUnique({
+      where: { id },
+    });
+
+    if (!existingCar) {
+      throw new Error("Car not found");
+    }
+
+    // Determine which images to delete from Supabase storage
+    const keptImagesSet = new Set(existingImages);
+    const imagesToDelete = existingCar.images.filter((img) => !keptImagesSet.has(img));
+
+    if (imagesToDelete.length > 0) {
+      try {
+        const filePathsToDelete = imagesToDelete
+          .map((imageUrl) => {
+            try {
+              const url = new URL(imageUrl);
+              const pathMatch = url.pathname.match(/\/carai\/(.*)/);
+              return pathMatch ? pathMatch[1] : null;
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean);
+
+        if (filePathsToDelete.length > 0) {
+          await supabaseAdmin.storage.from("carai").remove(filePathsToDelete);
+        }
+      } catch (storageError) {
+        console.error("Error removing deleted images from storage:", storageError);
+      }
+    }
+
+    // Upload new images to Supabase storage
+    const uploadedNewImageUrls = [];
+    const folderPath = `cars/${id}`;
+
+    if (newImages && newImages.length > 0) {
+      for (let i = 0; i < newImages.length; i++) {
+        const file = newImages[i];
+        if (!file || typeof file.arrayBuffer !== "function") continue;
+
+        const arrayBuffer = await file.arrayBuffer();
+        const imageBuffer = Buffer.from(arrayBuffer);
+        const fileExtension = file.type?.split("/")[1] || "jpeg";
+        const fileName = `image-${Date.now()}-${i}.${fileExtension}`;
+        const filePath = `${folderPath}/${fileName}`;
+
+        const { error } = await supabaseAdmin.storage
+          .from("carai")
+          .upload(filePath, imageBuffer, {
+            contentType: file.type || `image/${fileExtension}`,
+          });
+
+        if (error) {
+          console.error("Error uploading new image:", error);
+          throw new Error(`Failed to upload image: ${error.message}`);
+        }
+
+        const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/carai/${filePath}`;
+        uploadedNewImageUrls.push(publicUrl);
+      }
+    }
+
+    const finalImages = [...existingImages, ...uploadedNewImageUrls];
+
+    if (finalImages.length === 0) {
+      throw new Error("A car must have at least one image");
+    }
+
+    // Update car in database
+    const updatedCar = await db.car.update({
+      where: { id },
+      data: {
+        make: carData.make,
+        model: carData.model,
+        year: parseInt(carData.year, 10),
+        price: parseFloat(carData.price),
+        mileage: parseInt(carData.mileage, 10),
+        color: carData.color,
+        fuelType: carData.fuelType,
+        transmission: carData.transmission,
+        bodyType: carData.bodyType,
+        seats: carData.seats ? parseInt(carData.seats, 10) : null,
+        description: carData.description,
+        status: carData.status,
+        featured: carData.featured,
+        images: finalImages,
+      },
+    });
+
+    revalidatePath("/admin/cars");
+    revalidatePath(`/cars/${id}`);
+    revalidatePath("/cars");
+    revalidatePath("/");
+
+    return {
+      success: true,
+      data: serializeCarData(updatedCar),
+    };
+  } catch (error) {
+    console.error("Error updating car:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+// Submit car inquiry from customer
+export async function submitCarInquiry({
+  carId,
+  name,
+  email,
+  phone,
+  message,
+  preferredContact = "EMAIL",
+}) {
+  try {
+    if (!name || !email || !message) {
+      throw new Error("Name, email, and message are required");
+    }
+
+    // Optional user authentication
+    const { user: dbUser } = await getAuth();
+
+    const inquiry = await db.carInquiry.create({
+      data: {
+        carId: carId || null,
+        userId: dbUser?.id || null,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone ? phone.trim() : null,
+        message: message.trim(),
+        preferredContact: preferredContact || "EMAIL",
+        status: "NEW",
+      },
+    });
+
+    return {
+      success: true,
+      message:
+        "Thank you! Your inquiry has been submitted. Our team will contact you shortly.",
+      data: inquiry,
+    };
+  } catch (error) {
+    console.error("Error submitting inquiry:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to submit inquiry",
+    };
+  }
+}
+
+// Quick price update for admin
+export async function updateCarPrice(id, newPrice) {
+  try {
+    const { user } = await getAuth();
+    if (!user || user.role !== "ADMIN") {
+      throw new Error("Admin privileges required");
+    }
+
+    const priceNum = parseFloat(newPrice);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      throw new Error("Please enter a valid positive price");
+    }
+
+    await db.car.update({
+      where: { id },
+      data: { price: priceNum },
+    });
+
+    revalidatePath("/admin/cars");
+    revalidatePath(`/cars/${id}`);
+    revalidatePath("/cars");
+    revalidatePath("/");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating car price:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Bulk update car statuses
+export async function bulkUpdateCarStatus(carIds, newStatus) {
+  try {
+    const { user } = await getAuth();
+    if (!user || user.role !== "ADMIN") {
+      throw new Error("Admin privileges required");
+    }
+
+    if (!Array.isArray(carIds) || carIds.length === 0) {
+      throw new Error("No cars selected");
+    }
+
+    await db.car.updateMany({
+      where: { id: { in: carIds } },
+      data: { status: newStatus },
+    });
+
+    revalidatePath("/admin/cars");
+    revalidatePath("/admin");
+    revalidatePath("/cars");
+    revalidatePath("/");
+
+    return { success: true, count: carIds.length };
+  } catch (error) {
+    console.error("Error bulk updating cars:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Bulk delete cars
+export async function bulkDeleteCars(carIds) {
+  try {
+    const { user } = await getAuth();
+    if (!user || user.role !== "ADMIN") {
+      throw new Error("Admin privileges required");
+    }
+
+    if (!Array.isArray(carIds) || carIds.length === 0) {
+      throw new Error("No cars selected");
+    }
+
+    await db.car.deleteMany({
+      where: { id: { in: carIds } },
+    });
+
+    revalidatePath("/admin/cars");
+    revalidatePath("/admin");
+    revalidatePath("/cars");
+    revalidatePath("/");
+
+    return { success: true, count: carIds.length };
+  } catch (error) {
+    console.error("Error bulk deleting cars:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Clone an existing car entry
+export async function cloneCar(carId) {
+  try {
+    const { user } = await getAuth();
+    if (!user || user.role !== "ADMIN") {
+      throw new Error("Admin privileges required");
+    }
+
+    const source = await db.car.findUnique({
+      where: { id: carId },
+    });
+
+    if (!source) throw new Error("Car not found");
+
+    const cloned = await db.car.create({
+      data: {
+        make: source.make,
+        model: `${source.model} (Copy)`,
+        year: source.year,
+        price: source.price,
+        mileage: source.mileage,
+        color: source.color,
+        fuelType: source.fuelType,
+        transmission: source.transmission,
+        bodyType: source.bodyType,
+        seats: source.seats,
+        description: source.description,
+        status: "AVAILABLE",
+        featured: false,
+        images: source.images || [],
+      },
+    });
+
+    revalidatePath("/admin/cars");
+    revalidatePath("/cars");
+    revalidatePath("/");
+
+    return { success: true, data: serializeCarData(cloned) };
+  } catch (error) {
+    console.error("Error cloning car:", error);
+    return { success: false, error: error.message };
   }
 }

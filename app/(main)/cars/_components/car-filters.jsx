@@ -4,7 +4,6 @@ import { useCallback, useState, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Filter, X, Sliders } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
   SheetContent,
@@ -22,25 +21,41 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export const CarFilters = ({ filters }) => {
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest first" },
+  { value: "priceAsc", label: "Price: low to high" },
+  { value: "priceDesc", label: "Price: high to low" },
+];
+
+export const CarFilters = ({ filters: filtersProp }) => {
+  // Safe defaults so an empty filters object can't crash the page
+  const filters = {
+    makes: [],
+    bodyTypes: [],
+    fuelTypes: [],
+    transmissions: [],
+    ...filtersProp,
+    priceRange: { min: 0, max: 100000, ...(filtersProp?.priceRange || {}) },
+  };
+
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Get current filter values from searchParams
+  // Current filter values from the URL
   const currentMake = searchParams.get("make") || "";
   const currentBodyType = searchParams.get("bodyType") || "";
   const currentFuelType = searchParams.get("fuelType") || "";
   const currentTransmission = searchParams.get("transmission") || "";
   const currentMinPrice = searchParams.get("minPrice")
     ? parseInt(searchParams.get("minPrice"))
-    : filters?.priceRange?.min ?? 0;
+    : filters.priceRange.min;
   const currentMaxPrice = searchParams.get("maxPrice")
     ? parseInt(searchParams.get("maxPrice"))
-    : filters?.priceRange?.max ?? 100000;
+    : filters.priceRange.max;
   const currentSortBy = searchParams.get("sortBy") || "newest";
 
-  // Local state for filters
+  // Local state
   const [make, setMake] = useState(currentMake);
   const [bodyType, setBodyType] = useState(currentBodyType);
   const [fuelType, setFuelType] = useState(currentFuelType);
@@ -52,7 +67,7 @@ export const CarFilters = ({ filters }) => {
   const [sortBy, setSortBy] = useState(currentSortBy);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  // Update local state when URL parameters change
+  // Sync local state when the URL changes
   useEffect(() => {
     setMake(currentMake);
     setBodyType(currentBodyType);
@@ -80,45 +95,56 @@ export const CarFilters = ({ filters }) => {
       currentMaxPrice < filters.priceRange.max,
   ].filter(Boolean).length;
 
-  // Update URL when filters change
-  const applyFilters = useCallback(() => {
-    const params = new URLSearchParams();
+  // Push filters to the URL. `overrides` lets a caller apply a value that
+  // hasn't reached state yet (used by the sort dropdown).
+  const applyFilters = useCallback(
+    (overrides = {}) => {
+      const next = {
+        make,
+        bodyType,
+        fuelType,
+        transmission,
+        priceRange,
+        sortBy,
+        ...overrides,
+      };
+      const params = new URLSearchParams();
 
-    if (make) params.set("make", make);
-    if (bodyType) params.set("bodyType", bodyType);
-    if (fuelType) params.set("fuelType", fuelType);
-    if (transmission) params.set("transmission", transmission);
-    if (priceRange[0] > filters.priceRange.min)
-      params.set("minPrice", priceRange[0].toString());
-    if (priceRange[1] < filters.priceRange.max)
-      params.set("maxPrice", priceRange[1].toString());
-    if (sortBy !== "newest") params.set("sortBy", sortBy);
+      if (next.make) params.set("make", next.make);
+      if (next.bodyType) params.set("bodyType", next.bodyType);
+      if (next.fuelType) params.set("fuelType", next.fuelType);
+      if (next.transmission) params.set("transmission", next.transmission);
+      if (next.priceRange[0] > filters.priceRange.min)
+        params.set("minPrice", next.priceRange[0].toString());
+      if (next.priceRange[1] < filters.priceRange.max)
+        params.set("maxPrice", next.priceRange[1].toString());
+      if (next.sortBy !== "newest") params.set("sortBy", next.sortBy);
 
-    // Preserve search and page params if they exist
-    const search = searchParams.get("search");
-    const page = searchParams.get("page");
-    if (search) params.set("search", search);
-    if (page && page !== "1") params.set("page", page);
+      // Preserve search and page params if they exist
+      const search = searchParams.get("search");
+      const page = searchParams.get("page");
+      if (search) params.set("search", search);
+      if (page && page !== "1") params.set("page", page);
 
-    const query = params.toString();
-    const url = query ? `${pathname}?${query}` : pathname;
+      const query = params.toString();
+      router.push(query ? `${pathname}?${query}` : pathname);
+      setIsSheetOpen(false);
+    },
+    [
+      make,
+      bodyType,
+      fuelType,
+      transmission,
+      priceRange,
+      sortBy,
+      pathname,
+      searchParams,
+      router,
+      filters.priceRange.min,
+      filters.priceRange.max,
+    ],
+  );
 
-    router.push(url);
-    setIsSheetOpen(false);
-  }, [
-    make,
-    bodyType,
-    fuelType,
-    transmission,
-    priceRange,
-    sortBy,
-    pathname,
-    searchParams,
-    filters.priceRange.min,
-    filters.priceRange.max,
-  ]);
-
-  // Handle filter changes
   const handleFilterChange = (filterName, value) => {
     switch (filterName) {
       case "make":
@@ -139,12 +165,8 @@ export const CarFilters = ({ filters }) => {
     }
   };
 
-  // Handle clearing specific filter
-  const handleClearFilter = (filterName) => {
-    handleFilterChange(filterName, "");
-  };
+  const handleClearFilter = (filterName) => handleFilterChange(filterName, "");
 
-  // Clear all filters
   const clearFilters = () => {
     setMake("");
     setBodyType("");
@@ -153,19 +175,16 @@ export const CarFilters = ({ filters }) => {
     setPriceRange([filters.priceRange.min, filters.priceRange.max]);
     setSortBy("newest");
 
-    // Keep search term if exists
+    // Keep search term if it exists
     const params = new URLSearchParams();
     const search = searchParams.get("search");
     if (search) params.set("search", search);
 
     const query = params.toString();
-    const url = query ? `${pathname}?${query}` : pathname;
-
-    router.push(url);
+    router.push(query ? `${pathname}?${query}` : pathname);
     setIsSheetOpen(false);
   };
 
-  // Current filters object for the controls component
   const currentFilters = {
     make,
     bodyType,
@@ -177,84 +196,75 @@ export const CarFilters = ({ filters }) => {
   };
 
   return (
-    <div className="flex lg:flex-col justify-between gap-4">
-      {/* Mobile Filters */}
-      <div className="lg:hidden mb-4">
-        <div className="flex items-center">
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                className="flex items-center gap-2 border-[#e7e5e1] text-[#1a1a1a] hover:bg-[#faf9f7] hover:text-[#1a1a1a]"
-              >
-                <Filter className="h-4 w-4" />
+    <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-stretch lg:gap-4">
+      {/* Mobile: filters sheet */}
+      <div className="lg:hidden">
+        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <SheetTrigger asChild>
+            <Button className="h-11 gap-2 rounded-full bg-[#161213] px-5 font-semibold text-white hover:bg-black">
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#E4141B] px-1 text-xs font-semibold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+          </SheetTrigger>
+          <SheetContent
+            side="left"
+            className="w-full overflow-y-auto sm:max-w-md"
+          >
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2 font-montserrat text-xl font-[800] tracking-tight text-black">
+                <Sliders className="h-4 w-4 text-[#E4141B]" />
                 Filters
-                {activeFilterCount > 0 && (
-                  <Badge className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center bg-[#d6352b] text-white hover:bg-[#d6352b]">
-                    {activeFilterCount}
-                  </Badge>
-                )}
+              </SheetTitle>
+            </SheetHeader>
+
+            <div className="px-4 py-6">
+              <CarFilterControls
+                filters={filters}
+                currentFilters={currentFilters}
+                onFilterChange={handleFilterChange}
+                onClearFilter={handleClearFilter}
+              />
+            </div>
+
+            <SheetFooter className="mt-auto flex-row gap-3 border-t border-black/10 pt-4 sm:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={clearFilters}
+                className="h-11 flex-1 rounded-full border-black/15"
+              >
+                Reset
               </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="left"
-              className="w-full sm:max-w-md overflow-y-auto"
-            >
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2 text-[#1a1a1a]">
-                  <Sliders className="h-4 w-4 text-[#d6352b]" />
-                  Filters
-                </SheetTitle>
-              </SheetHeader>
-
-              <div className="py-6">
-                <CarFilterControls
-                  filters={filters}
-                  currentFilters={currentFilters}
-                  onFilterChange={handleFilterChange}
-                  onClearFilter={handleClearFilter}
-                />
-              </div>
-
-              <SheetFooter className="sm:justify-between flex-row pt-4 border-t border-[#e7e5e1] space-x-4 mt-auto">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={clearFilters}
-                  className="flex-1 border-[#e7e5e1] text-[#1a1a1a] hover:bg-[#faf9f7]"
-                >
-                  Reset
-                </Button>
-                <Button
-                  type="button"
-                  onClick={applyFilters}
-                  className="flex-1 bg-[#d6352b] text-white hover:bg-[#b82a22]"
-                >
-                  Show Results
-                </Button>
-              </SheetFooter>
-            </SheetContent>
-          </Sheet>
-        </div>
+              <Button
+                type="button"
+                onClick={() => applyFilters()}
+                className="h-11 flex-1 rounded-full bg-[#E4141B] font-semibold text-white hover:bg-[#c81219]"
+              >
+                Show results
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
       </div>
 
+      {/* Sort */}
       <Select
         value={sortBy}
         onValueChange={(value) => {
           setSortBy(value);
-          // Apply filters immediately when sort changes
-          setTimeout(() => applyFilters(), 0);
+          applyFilters({ sortBy: value });
         }}
       >
-        <SelectTrigger className="w-[180px] lg:w-full border-[#e7e5e1] focus:ring-[#d6352b]">
+        <SelectTrigger className="h-11 w-[190px] rounded-full border-black/10 bg-white font-medium focus:ring-[#E4141B]/40 lg:w-full">
           <SelectValue placeholder="Sort by" />
         </SelectTrigger>
         <SelectContent>
-          {[
-            { value: "newest", label: "Newest First" },
-            { value: "priceAsc", label: "Price: Low to High" },
-            { value: "priceDesc", label: "Price: High to Low" },
-          ].map((option) => (
+          {SORT_OPTIONS.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
@@ -262,28 +272,32 @@ export const CarFilters = ({ filters }) => {
         </SelectContent>
       </Select>
 
-      {/* Desktop Filters */}
-      <div className="hidden lg:block sticky top-24">
-        <div className="rounded-lg overflow-hidden bg-white border border-[#e7e5e1] border-t-2 border-t-[#d6352b]">
-          <div className="p-4 border-b border-[#e7e5e1] flex justify-between items-center">
-            <h3 className="font-medium flex items-center text-[#1a1a1a]">
-              <Sliders className="mr-2 h-4 w-4 text-[#d6352b]" />
+      {/* Desktop: filter panel */}
+      <div className="hidden lg:sticky lg:top-24 lg:block">
+        <div className="overflow-hidden rounded-3xl border border-black/5 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.18)]">
+          <div className="flex items-center justify-between bg-[#161213] px-5 py-4 text-white">
+            <h3 className="flex items-center gap-2 font-montserrat text-lg font-[800] tracking-tight">
+              <Sliders className="h-4 w-4 text-[#E4141B]" />
               Filters
+              {activeFilterCount > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#E4141B] px-1 text-xs font-semibold">
+                  {activeFilterCount}
+                </span>
+              )}
             </h3>
             {activeFilterCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-sm text-[#6b6b66] hover:text-[#d6352b] hover:bg-transparent"
+              <button
+                type="button"
                 onClick={clearFilters}
+                className="flex items-center rounded-md text-sm text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E4141B]/60"
               >
                 <X className="mr-1 h-3 w-3" />
-                Clear All
-              </Button>
+                Clear all
+              </button>
             )}
           </div>
 
-          <div className="p-4">
+          <div className="p-5">
             <CarFilterControls
               filters={filters}
               currentFilters={currentFilters}
@@ -292,12 +306,12 @@ export const CarFilters = ({ filters }) => {
             />
           </div>
 
-          <div className="px-4 py-4 border-t border-[#e7e5e1]">
+          <div className="border-t border-black/5 p-5">
             <Button
-              onClick={applyFilters}
-              className="w-full bg-[#d6352b] text-white hover:bg-[#b82a22]"
+              onClick={() => applyFilters()}
+              className="h-12 w-full rounded-full bg-[#E4141B] font-semibold text-white hover:bg-[#c81219]"
             >
-              Apply Filters
+              Apply filters
             </Button>
           </div>
         </div>

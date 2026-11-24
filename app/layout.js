@@ -1,8 +1,10 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
+import { CustomAuthProvider } from "@/components/layout/auth-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { DemoCredentialsModal } from "@/components/DemoCredentialsModal";
+import { CompareFloatingBar } from "@/components/cars/compare-bar";
+import { AiAssistantWidget } from "@/components/ai/ai-assistant-widget";
+import { BackToTopButton } from "@/components/layout/back-to-top";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -15,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default function RootLayout({ children }) {
   return (
-    <ClerkProvider>
+    <CustomAuthProvider>
       <html lang="en">
         <head>
           <link rel="icon" href="/logo-white.png" sizes="any" />
@@ -23,9 +25,11 @@ export default function RootLayout({ children }) {
         <body className={`${inter.className}`}>
           <Toaster richColors />
           <main className="min-h-screen">{children}</main>
-          <DemoCredentialsModal />
+          <CompareFloatingBar />
+          <AiAssistantWidget />
+          <BackToTopButton />
         </body>
       </html>
-    </ClerkProvider>
+    </CustomAuthProvider>
   );
 }

@@ -12,6 +12,7 @@ import {
   Car,
   CheckCircle2,
   Loader2,
+  CalendarPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -494,10 +495,35 @@ export function TestDriveForm({ car, testDriveInfo }) {
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-2 pt-2">
+            {bookingResult?.data && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto text-xs flex items-center justify-center gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
+                onClick={() => {
+                  try {
+                    const dateClean = format(new Date(bookingResult.data.bookingDate), "yyyyMMdd");
+                    const startClean = (bookingResult.data.startTime || "10:00").replace(":", "") + "00";
+                    const endClean = (bookingResult.data.endTime || "11:00").replace(":", "") + "00";
+                    const title = encodeURIComponent(`Test Drive: ${car.year} ${car.make} ${car.model}`);
+                    const details = encodeURIComponent(`Test drive confirmed at ${dealership?.name || "CarsAi Showroom"}. Dealership address: Cairo, Egypt. Phone: +20 100 901 4597.`);
+                    const location = encodeURIComponent(dealership?.address || "CarsAi Dealership, Cairo, Egypt");
+                    const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateClean}T${startClean}/${dateClean}T${endClean}&details=${details}&location=${location}`;
+                    window.open(calUrl, "_blank");
+                  } catch (e) {
+                    toast.error("Could not generate calendar link");
+                  }
+                }}
+              >
+                <CalendarPlus className="h-3.5 w-3.5 text-blue-600" />
+                <span>Add to Google Calendar</span>
+              </Button>
+            )}
             <Button
               onClick={handleCloseConfirmation}
-              className="bg-red-600 hover:bg-red-700"
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 sm:ml-auto"
             >
               Done
             </Button>

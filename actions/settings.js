@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/auth";
 
 // Get dealership info with working hours
 export async function getDealershipInfo() {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const { user } = await getAuth();
+    if (!user) throw new Error("Unauthorized");
 
     // Get the dealership record
     let dealership = await db.dealershipInfo.findFirst({
@@ -100,14 +100,7 @@ export async function getDealershipInfo() {
 // Save working hours
 export async function saveWorkingHours(workingHours) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
-
-    // Check if user is admin
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
+    const { user } = await getAuth();
     if (!user || user.role !== "ADMIN") {
       throw new Error("Unauthorized: Admin access required");
     }
@@ -152,14 +145,7 @@ export async function saveWorkingHours(workingHours) {
 // Get all users
 export async function getUsers() {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
-
-    // Check if user is admin
-    const adminUser = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
+    const { user: adminUser } = await getAuth();
     if (!adminUser || adminUser.role !== "ADMIN") {
       throw new Error("Unauthorized: Admin access required");
     }
@@ -185,14 +171,7 @@ export async function getUsers() {
 // Update user role
 export async function updateUserRole(userId, role) {
   try {
-    const { userId: adminId } = await auth();
-    if (!adminId) throw new Error("Unauthorized");
-
-    // Check if user is admin
-    const adminUser = await db.user.findUnique({
-      where: { clerkUserId: adminId },
-    });
-
+    const { user: adminUser } = await getAuth();
     if (!adminUser || adminUser.role !== "ADMIN") {
       throw new Error("Unauthorized: Admin access required");
     }
@@ -211,5 +190,57 @@ export async function updateUserRole(userId, role) {
     };
   } catch (error) {
     throw new Error("Error updating user role:" + error.message);
+  }
+}
+
+// Update dealership profile details
+export async function updateDealershipProfile({ name, address, phone, email }) {
+  try {
+    const { user: adminUser } = await getAuth();
+    if (!adminUser || adminUser.role !== "ADMIN") {
+      throw new Error("Unauthorized: Admin access required");
+    }
+
+    let dealership = await db.dealershipInfo.findFirst();
+
+    if (!dealership) {
+      dealership = await db.dealershipInfo.create({
+        data: {
+          name: name || "CarsAi",
+          address: address || "Egypt Cairo",
+          phone: phone || "01009014597",
+          email: email || "support@carsai.com",
+        },
+      });
+    } else {
+      dealership = await db.dealershipInfo.update({
+        where: { id: dealership.id },
+        data: {
+          name: name?.trim() || dealership.name,
+          address: address?.trim() || dealership.address,
+          phone: phone?.trim() || dealership.phone,
+          email: email?.trim() || dealership.email,
+        },
+      });
+    }
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin");
+    revalidatePath("/");
+
+    return {
+      success: true,
+      data: {
+        ...dealership,
+        createdAt: dealership.createdAt.toISOString(),
+        updatedAt: dealership.updatedAt.toISOString(),
+      },
+    };
+  } catch (error) {
+    console.error("Error updating dealership profile:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
   }
 }
