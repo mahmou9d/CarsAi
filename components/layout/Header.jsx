@@ -101,7 +101,7 @@ const Header = async ({ isAdminPage = false }) => {
         )}
 
         {/* Right: actions */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center">
           {isAdminPage ? (
             <Button asChild variant="ghost" size="sm" className={iconBtn}>
               <Link href="/">
