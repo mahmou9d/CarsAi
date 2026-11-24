@@ -11,6 +11,17 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata = {
   title: "CarsAi",
   description: "Find your Dream Car",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
 };
 
 export const dynamic = "force-dynamic";
@@ -19,9 +30,6 @@ export default function RootLayout({ children }) {
   return (
     <CustomAuthProvider>
       <html lang="en">
-        <head>
-          <link rel="icon" href="/logo-white.png" sizes="any" />
-        </head>
         <body className={`${inter.className}`}>
           <Toaster richColors />
           <main className="min-h-screen">{children}</main>
